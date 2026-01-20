@@ -80,7 +80,7 @@ export const handler = async (event) => {
       email,
       passwordHash,
       role: "PLAYER",
-      name: body.name ?? null,
+      firstname: body.firstname ?? null,
       surname: body.surname ?? null,
       phone: body.phone ?? null,
       dni: body.dni ?? null,

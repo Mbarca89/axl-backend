@@ -14,9 +14,6 @@ function json(statusCode, body) {
     statusCode,
     headers: {
       "content-type": "application/json",
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "OPTIONS,POST",
-      "access-control-allow-headers": "content-type,authorization",
     },
     body: JSON.stringify(body),
   };
@@ -48,7 +45,7 @@ export const handler = async (event) => {
     const auth = requireAuth(event);
     const body = event.body ? JSON.parse(event.body) : {};
 
-    if (!body.name) {
+    if (!body.teamName) {
       return json(400, { message: "Falta el nombre del equipo" });
     }
 
@@ -60,7 +57,7 @@ export const handler = async (event) => {
       TableName: TEAMS_TABLE,
       Item: {
         teamId,
-        name: body.name,
+        teamName: body.teamName,
         ownerUserId: auth.sub,
         country: body.country ?? null,
         province: body.province ?? null,
@@ -88,7 +85,7 @@ export const handler = async (event) => {
 
     return json(201, {
       message: "Equipo creado",
-      team: { teamId, name: body.name },
+      team: { teamId, teamName: body.teamName },
     });
   } catch (err) {
     console.error(err);

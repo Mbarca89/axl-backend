@@ -14,9 +14,6 @@ function json(statusCode, body) {
     statusCode,
     headers: {
       "content-type": "application/json",
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "OPTIONS,GET",
-      "access-control-allow-headers": "content-type,authorization",
     },
     body: JSON.stringify(body),
   };
@@ -92,7 +89,7 @@ export const handler = async (event) => {
 
       const dto = {
         teamId: team.teamId,
-        name: team.name,
+        teamName: team.teamName,
         country: team.country ?? null,
         province: team.province ?? null,
         ownerUserId: team.ownerUserId,

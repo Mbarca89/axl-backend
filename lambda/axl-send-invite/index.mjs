@@ -22,9 +22,6 @@ function json(statusCode, body) {
     statusCode,
     headers: {
       "content-type": "application/json",
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "OPTIONS,POST",
-      "access-control-allow-headers": "content-type,authorization",
     },
     body: JSON.stringify(body),
   };
@@ -123,6 +120,7 @@ export const handler = async (event) => {
         TableName: TEAM_INVITES_TABLE,
         Item: {
           teamId,
+          teamName: team.teamName,
           sk: `INVITE#${inviteId}`,
           inviteId,
           toUserId: targetUser.userId,
@@ -140,6 +138,7 @@ export const handler = async (event) => {
       invite: {
         inviteId,
         teamId,
+        teamName: team.teamName,
         toUserId: targetUser.userId,
         inviteRole,
         status: "PENDING",

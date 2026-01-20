@@ -1,84 +1,109 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import jwt from "jsonwebtoken";
+import { DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-const TEAM_INVITES_TABLE = process.env.TEAM_INVITES_TABLE;
-const USER_INVITES_INDEX = process.env.USER_INVITES_INDEX || "GSI_UserInvites";
-const JWT_SECRET = process.env.JWT_SECRET;
+const USERS_TABLE = process.env.USERS_TABLE || "Users";
+const USERNAME_INDEX = process.env.USERNAME_INDEX || "GSI_Username";
+const EMAIL_INDEX = process.env.EMAIL_INDEX || "GSI_Email";
 
 function json(statusCode, body) {
   return {
     statusCode,
     headers: {
       "content-type": "application/json",
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "OPTIONS,GET",
-      "access-control-allow-headers": "content-type,authorization",
     },
     body: JSON.stringify(body),
   };
 }
 
-function requireAuth(event) {
-  const auth = event.headers?.authorization || event.headers?.Authorization || "";
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  if (!m) {
-    const e = new Error("Falta Authorization: Bearer <token>");
-    e.statusCode = 401;
-    throw e;
-  }
-  try {
-    return jwt.verify(m[1], JWT_SECRET);
-  } catch {
-    const e = new Error("Token inválido o expirado");
-    e.statusCode = 401;
-    throw e;
-  }
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+function normalizeUsername(u) {
+  return String(u || "").trim().toLowerCase();
+}
+
+async function existsByIndex(indexName, attrName, value) {
+  const res = await ddb.send(
+    new QueryCommand({
+      TableName: USERS_TABLE,
+      IndexName: indexName,
+      KeyConditionExpression: "#k = :v",
+      ExpressionAttributeNames: { "#k": attrName },
+      ExpressionAttributeValues: { ":v": value },
+      Limit: 1,
+    })
+  );
+  return (res.Items?.length || 0) > 0;
 }
 
 export const handler = async (event) => {
-  if (event.requestContext?.http?.method === "OPTIONS") return json(200, { ok: true });
+  // Preflight CORS
+  if (event.requestContext?.http?.method === "OPTIONS") {
+    return json(200, { ok: true });
+  }
 
   try {
-    const auth = requireAuth(event);
+    const body = event.body ? JSON.parse(event.body) : {};
+    const username = normalizeUsername(body.username);
+    const email = normalizeEmail(body.email);
+    const password = String(body.password || "");
 
-    // opcional: ?status=PENDING
-    const qs = event.queryStringParameters || {};
-    const status = (qs.status || "PENDING").toUpperCase();
+    if (!username || !email || !password) {
+      return json(400, { message: "Faltan campos obligatorios: username, email, password" });
+    }
+    if (password.length < 6) {
+      return json(400, { message: "La contraseña debe tener al menos 6 caracteres" });
+    }
 
-    const res = await ddb.send(
-      new QueryCommand({
-        TableName: TEAM_INVITES_TABLE,
-        IndexName: USER_INVITES_INDEX,
-        KeyConditionExpression: "#u = :uid",
-        ExpressionAttributeNames: { "#u": "toUserId" },
-        ExpressionAttributeValues: { ":uid": auth.sub },
-        ScanIndexForward: false, // más nuevas primero si SK es createdAt
+    // checks de unicidad
+    if (await existsByIndex(USERNAME_INDEX, "username", username)) {
+      return json(409, { message: "Ese usuario ya existe" });
+    }
+    if (await existsByIndex(EMAIL_INDEX, "email", email)) {
+      return json(409, { message: "Ese email ya está registrado" });
+    }
+
+    const userId = crypto.randomUUID();
+    const passwordHash = await bcrypt.hash(password, 10);
+    const now = new Date().toISOString();
+
+    const item = {
+      userId,
+      username,
+      email,
+      passwordHash,
+      role: "PLAYER",
+      firstname: body.firstname ?? null,
+      surname: body.surname ?? null,
+      phone: body.phone ?? null,
+      dni: body.dni ?? null,
+      birthDate: body.birthDate ?? null, // YYYY-MM-DD
+      position: body.position ?? null,
+      side: body.side ?? null,
+      number: body.number ?? null,
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await ddb.send(
+      new PutCommand({
+        TableName: USERS_TABLE,
+        Item: item,
+        ConditionExpression: "attribute_not_exists(userId)",
       })
     );
 
-    let items = res.Items || [];
-
-    // Filtrado por status (como no pusimos status en la key del índice, filtramos en memoria)
-    if (status && status !== "ALL") {
-      items = items.filter((i) => i.status === status);
-    }
-
-    // respuesta prolija
-    const invites = items.map((i) => ({
-      teamId: i.teamId,
-      inviteId: i.inviteId,
-      inviteRole: i.inviteRole,
-      status: i.status,
-      createdAt: i.createdAt,
-      createdByUserId: i.createdByUserId,
-    }));
-
-    return json(200, { message: "OK", invites });
+    return json(201, {
+      message: "Registro OK",
+      user: { userId, username, email, role: "PLAYER" },
+    });
   } catch (err) {
     console.error(err);
-    return json(err.statusCode || 500, { message: err.message || "Error interno" });
+    return json(500, { message: "Error interno" });
   }
 };
