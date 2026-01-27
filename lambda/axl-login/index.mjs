@@ -22,6 +22,7 @@ function json(statusCode, body) {
   };
 }
 
+
 async function findByIndex(indexName, attrName, value) {
   const res = await ddb.send(
     new QueryCommand({
@@ -38,9 +39,25 @@ async function findByIndex(indexName, attrName, value) {
 
 export const handler = async (event) => {
   // Preflight CORS
-  if (event.requestContext?.http?.method === "OPTIONS") {
-    return json(200, { ok: true });
-  }
+  const method =
+  event.requestContext?.http?.method ||
+  event.httpMethod ||
+  event.requestContext?.httpMethod ||
+  "";
+
+if (method === "OPTIONS") {
+  return {
+    statusCode: 200,
+    headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "OPTIONS,POST",
+      "access-control-allow-headers": "content-type,authorization",
+      "content-type": "application/json",
+    },
+    body: "",
+  };
+}
+
 
   try {
     if (!JWT_SECRET || JWT_SECRET.length < 20) {

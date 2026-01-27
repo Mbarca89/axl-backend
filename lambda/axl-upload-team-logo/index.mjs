@@ -18,9 +18,6 @@ function json(statusCode, body) {
         statusCode,
         headers: {
             "content-type": "application/json",
-            "access-control-allow-origin": "*",
-            "access-control-allow-methods": "OPTIONS,POST",
-            "access-control-allow-headers": "content-type,authorization",
         },
         body: JSON.stringify(body),
     };
@@ -46,6 +43,7 @@ function requireAuth(event) {
 function extFromContentType(ct) {
     if (ct === "image/jpeg") return "jpg";
     if (ct === "image/png") return "png";
+    if (ct === "image/webp") return "webp";
     return null;
 }
 
