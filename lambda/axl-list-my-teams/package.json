@@ -11,7 +11,9 @@
   "description": "",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.971.0",
+    "@aws-sdk/client-s3": "^3.972.0",
     "@aws-sdk/lib-dynamodb": "^3.971.0",
+    "@aws-sdk/s3-request-presigner": "^3.972.0",
     "jsonwebtoken": "^9.0.3"
   }
 }

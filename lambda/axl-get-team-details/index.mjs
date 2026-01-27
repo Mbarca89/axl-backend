@@ -115,7 +115,7 @@ export const handler = async (event) => {
         username: u.username ?? null,
         firstname: u.firstname ?? null,
         surname: u.surname ?? null,
-        avatarKey,
+        avatarUrl,
         joinedAt: m.joinedAt ?? null,
       };
     }
@@ -135,7 +135,7 @@ export const handler = async (event) => {
         country: team.country ?? null,
         province: team.province ?? null,
         ownerUserId: team.ownerUserId,
-        logoKey,
+        logoUrl,
       },
       players,
       staff,
@@ -145,5 +145,3 @@ export const handler = async (event) => {
     return json(err.statusCode || 500, { message: err.message || "Error interno" });
   }
 };
-
-

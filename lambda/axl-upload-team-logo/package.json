@@ -1,5 +1,5 @@
 {
-  "name": "axl-me",
+  "name": "axl-upload-team-logo",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -11,9 +11,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.968.0",
+    "@aws-sdk/client-dynamodb": "^3.972.0",
     "@aws-sdk/client-s3": "^3.972.0",
-    "@aws-sdk/lib-dynamodb": "^3.968.0",
+    "@aws-sdk/lib-dynamodb": "^3.972.0",
     "@aws-sdk/s3-request-presigner": "^3.972.0",
     "jsonwebtoken": "^9.0.3"
   }

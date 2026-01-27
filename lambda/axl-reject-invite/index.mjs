@@ -12,9 +12,6 @@ function json(statusCode, body) {
     statusCode,
     headers: {
       "content-type": "application/json",
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "OPTIONS,POST",
-      "access-control-allow-headers": "content-type,authorization",
     },
     body: JSON.stringify(body),
   };
