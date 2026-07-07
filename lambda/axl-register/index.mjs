@@ -26,6 +26,33 @@ function normalizeUsername(u) {
   return String(u || "").trim().toLowerCase();
 }
 
+function generatePlayerCode() {
+  // 5 dígitos + "-" + 4 dígitos = estilo 93934-5882
+  const a = crypto.randomInt(0, 100000).toString().padStart(5, "0");
+  const b = crypto.randomInt(0, 10000).toString().padStart(4, "0");
+  return `${a}-${b}`;
+}
+
+async function existsPlayerCode(playerCode) {
+  const res = await ddb.send(new QueryCommand({
+    TableName: USERS_TABLE,
+    IndexName: "GSI_PlayerCode",
+    KeyConditionExpression: "#pc = :v",
+    ExpressionAttributeNames: { "#pc": "playerCode" },
+    ExpressionAttributeValues: { ":v": playerCode },
+    Limit: 1
+  }));
+  return (res.Items?.length || 0) > 0;
+}
+
+async function generateUniquePlayerCode() {
+  for (let i = 0; i < 5; i++) {
+    const code = generatePlayerCode();
+    if (!(await existsPlayerCode(code))) return code;
+  }
+  throw new Error("No se pudo generar playerCode único");
+}
+
 async function existsByIndex(indexName, attrName, value) {
   const res = await ddb.send(
     new QueryCommand({
@@ -71,6 +98,8 @@ export const handler = async (event) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const now = new Date().toISOString();
 
+    const playerCode = await generateUniquePlayerCode();
+
     const item = {
       userId,
       username,
@@ -85,9 +114,10 @@ export const handler = async (event) => {
       position: body.position ?? null,
       side: body.side ?? null,
       number: body.number ?? null,
-      avatarUrl: null,
+      avatarKey: null,
       createdAt: now,
       updatedAt: now,
+      playerCode
     };
 
     await ddb.send(

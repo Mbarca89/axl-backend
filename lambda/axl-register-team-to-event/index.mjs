@@ -101,6 +101,8 @@ export const handler = async (event) => {
 
     const teamNameSnapshot = String(team.teamName || team.name || "").trim();
     if (!teamNameSnapshot) return json(500, { message: "El equipo no tiene nombre (teamName)" });
+    
+    const teamCountry = team.country
 
     // 4) Put inscripción (1 por team por event)
     const now = new Date().toISOString();
@@ -114,6 +116,7 @@ export const handler = async (event) => {
           sk,
           teamId,
           teamNameSnapshot,
+          teamCountry,
           category,
           registeredByUserId: auth.sub,
           status: "REGISTERED",

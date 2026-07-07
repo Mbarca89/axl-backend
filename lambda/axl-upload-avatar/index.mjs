@@ -74,8 +74,8 @@ export const handler = async (event) => {
       { expiresIn: SIGNED_UPLOAD_TTL_SECONDS }
     );
 
-    // Guardar avatarKey en Dynamo
-    await ddb.send(
+     // Guardar avatarKey en Dynamo
+     await ddb.send(
       new UpdateCommand({
         TableName: USERS_TABLE,
         Key: { userId: auth.sub },

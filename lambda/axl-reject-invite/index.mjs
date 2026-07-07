@@ -1,9 +1,8 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import jwt from "jsonwebtoken";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-
 const TEAM_INVITES_TABLE = process.env.TEAM_INVITES_TABLE;
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -35,53 +34,39 @@ function requireAuth(event) {
 }
 
 export const handler = async (event) => {
-  if (event.requestContext?.http?.method === "OPTIONS") return json(200, { ok: true });
+  const method = event.requestContext?.http?.method || event.httpMethod || "";
+  if (method === "OPTIONS") return json(200, { ok: true });
+  if (method !== "POST") return json(405, { message: "Method not allowed" });
 
   try {
     const auth = requireAuth(event);
     const body = event.body ? JSON.parse(event.body) : {};
-
     const teamId = String(body.teamId || "").trim();
-    const inviteId = String(body.inviteId || "").trim();
+
     if (!teamId) return json(400, { message: "Falta teamId" });
-    if (!inviteId) return json(400, { message: "Falta inviteId" });
 
-    // 1) Traer invite
-    const invRes = await ddb.send(
-      new GetCommand({
-        TableName: TEAM_INVITES_TABLE,
-        Key: { teamId, sk: `INVITE#${inviteId}` },
-      })
-    );
+    const key = { teamId, sk: `INVITE_TO#${auth.sub}` };
 
-    const invite = invRes.Item;
-    if (!invite) return json(404, { message: "Invitación no encontrada" });
-
-    if (invite.toUserId !== auth.sub) {
-      return json(403, { message: "No podés rechazar una invitación que no es tuya" });
-    }
-
-    if (invite.status !== "PENDING") {
-      return json(409, { message: `La invitación ya está en estado ${invite.status}` });
-    }
-
-    const now = new Date().toISOString();
-
-    // 2) Update status -> REJECTED
     await ddb.send(
-      new UpdateCommand({
+      new DeleteCommand({
         TableName: TEAM_INVITES_TABLE,
-        Key: { teamId, sk: `INVITE#${inviteId}` },
-        UpdateExpression: "SET #st = :r, rejectedAt = :t",
+        Key: key,
+        // solo borra si existía y estaba pending
         ConditionExpression: "#st = :p",
         ExpressionAttributeNames: { "#st": "status" },
-        ExpressionAttributeValues: { ":r": "REJECTED", ":t": now, ":p": "PENDING" },
+        ExpressionAttributeValues: { ":p": "PENDING" },
       })
     );
 
-    return json(200, { message: "Invitación rechazada", teamId, inviteId });
+    return json(200, { message: "Invitación rechazada", teamId });
   } catch (err) {
     console.error(err);
+
+    if (err?.name === "ConditionalCheckFailedException") {
+      // o no existe, o no estaba PENDING
+      return json(404, { message: "No tenés una invitación pendiente para ese equipo" });
+    }
+
     return json(err.statusCode || 500, { message: err.message || "Error interno" });
   }
 };

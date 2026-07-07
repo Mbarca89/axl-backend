@@ -1,0 +1,14 @@
+{
+  "name": "axl-manage-team-member",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.971.0",
+    "@aws-sdk/lib-dynamodb": "^3.971.0",
+    "jsonwebtoken": "^9.0.3",
+    "npm": "^10.9.4"
+  }
+}

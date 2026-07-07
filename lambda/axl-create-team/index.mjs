@@ -1,5 +1,8 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  TransactWriteCommand,
+} from "@aws-sdk/lib-dynamodb";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
@@ -12,9 +15,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 function json(statusCode, body) {
   return {
     statusCode,
-    headers: {
-      "content-type": "application/json",
-    },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   };
 }
@@ -36,6 +37,10 @@ function requireAuth(event) {
   }
 }
 
+function normalizeTeamName(name) {
+  return String(name).trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 export const handler = async (event) => {
   if (event.requestContext?.http?.method === "OPTIONS") {
     return json(200, { ok: true });
@@ -49,39 +54,66 @@ export const handler = async (event) => {
       return json(400, { message: "Falta el nombre del equipo" });
     }
 
+    const teamNameNormalized = normalizeTeamName(body.teamName);
+    const teamNameKey = `TEAMNAME#${teamNameNormalized}`;
+
     const teamId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    // 1) Crear equipo
-    await ddb.send(new PutCommand({
-      TableName: TEAMS_TABLE,
-      Item: {
-        teamId,
-        teamName: body.teamName,
-        ownerUserId: auth.sub,
-        country: body.country ?? null,
-        province: body.province ?? null,
-        createdAt: now,
-        updatedAt: now,
-      },
-      ConditionExpression: "attribute_not_exists(teamId)",
-    }));
+    await ddb.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: TEAMS_TABLE,
+              Item: {
+                teamId: `TEAMNAME#${teamNameNormalized}`,
+                type: "TEAM_NAME_LOCK",
+                teamNameNormalized,
+                teamNameOriginal: body.teamName,
+                createdAt: now,
+                pointsToTeamId: teamId,
+              },
+              ConditionExpression: "attribute_not_exists(teamId)",
+            },
+          },
 
-    // 2) Crear miembro OWNER
-    await ddb.send(new PutCommand({
-      TableName: TEAM_MEMBERS_TABLE,
-      Item: {
-        teamId,
-        sk: `USER#${auth.sub}`,
-        userId: auth.sub,
-        accessRole: "OWNER",
-        teamRole: body.teamRole || "PLAYER", 
-        status: "ACTIVE",
-        joinedAt: now,
-      },
-      ConditionExpression: "attribute_not_exists(sk)",
-    }));
+          {
+            Put: {
+              TableName: TEAMS_TABLE,
+              Item: {
+                teamId,
+                type: "TEAM",
+                teamName: body.teamName,
+                teamNameNormalized,
+                ownerUserId: auth.sub,
+                country: body.country ?? null,
+                province: body.province ?? null,
+                createdAt: now,
+                updatedAt: now,
+              },
+              ConditionExpression: "attribute_not_exists(teamId)",
+            },
+          },
 
+          {
+            Put: {
+              TableName: TEAM_MEMBERS_TABLE,
+              Item: {
+                teamId,
+                sk: `USER#${auth.sub}`,
+                userId: auth.sub,
+                accessRole: "OWNER",
+                teamRole: body.teamRole || "PLAYER",
+                status: "ACTIVE",
+                joinedAt: now,
+              },
+              ConditionExpression: "attribute_not_exists(sk)",
+            },
+          },
+        ],
+      })
+    );
 
     return json(201, {
       message: "Equipo creado",
@@ -89,6 +121,17 @@ export const handler = async (event) => {
     });
   } catch (err) {
     console.error(err);
-    return json(err.statusCode || 500, { message: err.message || "Error interno" });
+
+    const isNameTaken =
+      err?.name === "TransactionCanceledException" ||
+      err?.name === "ConditionalCheckFailedException";
+
+    if (isNameTaken) {
+      return json(409, { message: "Ya existe un equipo con ese nombre" });
+    }
+
+    return json(err.statusCode || 500, {
+      message: err.message || "Error interno",
+    });
   }
 };

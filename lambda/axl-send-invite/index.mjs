@@ -74,7 +74,36 @@ async function findUserByPlayerCode(playerCode) {
 }
 
 export const handler = async (event) => {
-  if (event.requestContext?.http?.method === "OPTIONS") return json(200, { ok: true });
+  const method =
+    event.requestContext?.http?.method ||
+    event.httpMethod ||
+    "";
+
+  console.log("method:", method);
+  console.log("rawPath:", event.rawPath, "routeKey:", event.routeKey);
+
+  // CORS preflight
+  if (method === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ ok: true }),
+    };
+  }
+
+  // Solo POST
+  if (method !== "POST") {
+    return {
+      statusCode: 405,
+      headers: {
+        "content-type": "application/json",
+        "access-control-allow-origin": "*",
+      },
+      body: JSON.stringify({ message: "Method not allowed" }),
+    };
+  }
 
   try {
     const auth = requireAuth(event);
@@ -112,32 +141,36 @@ export const handler = async (event) => {
       return json(409, { message: "Ese usuario ya es miembro del equipo" });
     }
 
-    const inviteId = crypto.randomUUID();
     const now = new Date().toISOString();
 
+    const inviteId = crypto.randomUUID();               
+    const inviteSk = `INVITE_TO#${targetUser.userId}`;  
+    
     await ddb.send(
       new PutCommand({
         TableName: TEAM_INVITES_TABLE,
         Item: {
           teamId,
+          sk: inviteSk,
+          inviteId,               
           teamName: team.teamName,
-          sk: `INVITE#${inviteId}`,
-          inviteId,
           toUserId: targetUser.userId,
           inviteRole,
           status: "PENDING",
           createdByUserId: auth.sub,
           createdAt: now,
+          updatedAt: now,
         },
-        ConditionExpression: "attribute_not_exists(sk)",
+        ConditionExpression: "attribute_not_exists(teamId) AND attribute_not_exists(sk)",
       })
     );
-
+    
     return json(201, {
       message: "Invitación creada",
       invite: {
         inviteId,
         teamId,
+        sk: inviteSk,
         teamName: team.teamName,
         toUserId: targetUser.userId,
         inviteRole,
@@ -147,6 +180,9 @@ export const handler = async (event) => {
     });
   } catch (err) {
     console.error(err);
+    if (err.name === "ConditionalCheckFailedException") {
+      return json(409, { message: "Ya existe una invitación pendiente para ese usuario" });
+    }
     return json(err.statusCode || 500, { message: err.message || "Error interno" });
   }
 };
