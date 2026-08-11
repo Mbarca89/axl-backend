@@ -73,10 +73,6 @@ export const handler = async (event) => {
 
     console.info("manage-team-member:start", { teamId, memberUserId, action, actorUserId: auth.sub });
 
-    if (memberUserId === auth.sub) {
-      return json(400, { message: "No podés gestionar tu propio usuario" });
-    }
-
     const me = await findMembership(teamId, auth.sub);
     console.info("manage-team-member:actor-membership", { teamId, actorUserId: auth.sub, me: me ? { status: me.status, accessRole: me.accessRole, sk: me.sk } : null });
 
@@ -95,11 +91,6 @@ export const handler = async (event) => {
     if (!member || member.status !== "ACTIVE") {
       return json(404, { message: "Miembro no encontrado" });
     }
-    if (member.accessRole === "OWNER") {
-      console.warn("manage-team-member:forbidden-target-owner", { teamId, memberUserId });
-      return json(403, { message: "No podés cambiar al dueño del equipo" });
-    }
-
     if (action === "SET_ROLE") {
       const teamRole = String(body.teamRole || "").trim().toUpperCase();
       if (!["PLAYER", "STAFF"].includes(teamRole)) {
@@ -118,6 +109,10 @@ export const handler = async (event) => {
     }
 
     if (action === "REMOVE") {
+      if (memberUserId === auth.sub || member.accessRole === "OWNER") {
+        console.warn("manage-team-member:forbidden-remove-owner", { teamId, memberUserId });
+        return json(403, { message: "El dueño del equipo no puede autoeliminarse" });
+      }
       await ddb.send(
         new UpdateCommand({
           TableName: TEAM_MEMBERS_TABLE,

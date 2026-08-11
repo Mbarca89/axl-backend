@@ -1,0 +1,15 @@
+{
+    "eventId": "axl-2026-fecha-2",
+    "season": 2026,
+    "name": "AXL Fecha 2 - San Luis",
+    "location": "San Luis",
+    "status": "REGISTRATION_OPEN",
+    "categories": [
+        "5v5 D3/D4",
+        "3v3 D4/D5",
+        "3v3 D6",
+        "3v3 Open"
+    ],
+    "registrationOpensAt": "2026-06-15T00:00:00-03:00",
+    "registrationClosesAt": "2026-08-01T23:59:59-03:00"
+}

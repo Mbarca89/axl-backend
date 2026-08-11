@@ -11,6 +11,12 @@ const PLAYER_EVENT_PARTICIPATION_TABLE =
   process.env.PLAYER_EVENT_PARTICIPATION_TABLE || "PlayerEventParticipation";
 const JWT_SECRET = process.env.JWT_SECRET;
 
+export function resolveTargetUserId(event, authenticatedUserId) {
+  const qs = event?.queryStringParameters || {};
+  const targetUserId = String(qs.userId || "").trim();
+  return targetUserId || authenticatedUserId;
+}
+
 function json(statusCode, body) {
   return {
     statusCode,
@@ -77,8 +83,9 @@ export const handler = async (event) => {
 
   try {
     const auth = requireAuth(event);
+    const targetUserId = resolveTargetUserId(event, auth.sub);
 
-    const items = await getPlayerEventHistory(auth.sub);
+    const items = await getPlayerEventHistory(targetUserId);
 
     const history = items
       .map((item) => ({
@@ -105,7 +112,7 @@ export const handler = async (event) => {
       });
 
     return json(200, {
-      userId: auth.sub,
+      userId: targetUserId,
       total: history.length,
       history,
     });

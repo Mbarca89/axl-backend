@@ -27,16 +27,12 @@ export const handler = async (event) => {
     const eventId = String(qs.eventId || "").trim();
     if (!eventId) return json(400, { message: "Falta eventId (querystring)" });
 
-    // categorías fijas del sistema (las tuyas)
-    const CAT_5V5 = "5v5 D3/D4";
-    const CAT_3V3_D5 = "3v3 D4/D5";
-    const CAT_3V3_D6 = "3v3 D6";
-
-    const buckets = {
-      [CAT_5V5]: [],
-      [CAT_3V3_D5]: [],
-      [CAT_3V3_D6]: [],
+    const defaultCategories = ["5v5 D3/D4", "3v3 D4/D5", "3v3 D6"];
+    const categoriesByEvent = {
+      "axl-2026-fecha-2": [...defaultCategories, "3v3 Open"],
     };
+    const categories = categoriesByEvent[eventId] ?? defaultCategories;
+    const buckets = Object.fromEntries(categories.map((category) => [category, []]));
 
     const res = await ddb.send(
       new QueryCommand({

@@ -5,6 +5,7 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 const EVENT_TEAM_POINTS_TABLE =
   process.env.EVENT_TEAM_POINTS_TABLE || "EventTeamPoints";
+const EXCLUDED_CATEGORIES = new Set(["3v3 Open"]);
 
 function json(statusCode, body) {
   return {
@@ -65,7 +66,7 @@ export const handler = async (event) => {
       calculationVersion: item.calculationVersion || null,
       closedAt: item.closedAt || null,
       closedBy: item.closedBy || null,
-    }));
+    })).filter((row) => !EXCLUDED_CATEGORIES.has(row.category));
 
     if (categoryFilter) {
       rows = rows.filter((r) => r.category === categoryFilter);
